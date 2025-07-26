@@ -1,0 +1,55 @@
+from flask import Flask, request, jsonify
+from datetime import datetime
+import psycopg2
+import os
+
+STORAGE_ACCOUNT = os.getenv("STORAGE_ACCOUNT", "cloudphotoimages")
+IMAGE_URL = f"https://{STORAGE_ACCOUNT}.blob.core.windows.net/photos/example.jpg"
+
+app = Flask(__name__)
+
+def get_connection():
+    return psycopg2.connect(
+        dbname="simple_net_db",
+        user="admin",
+        password="admin123",
+        host="10.1.2.5",
+        port="5432"
+    )
+
+@app.route('/add', methods=['GET'])
+def add_record():
+    try:
+        name = request.args.get('name')
+        value = int(request.args.get('value'))
+        time = request.args.get('time')
+        time_obj = datetime.strptime(time, "%a %b %d %H:%M:%S %Z %Y")
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("INSERT INTO records (name, value, time) VALUES (%s, %s, %s)", (name, value, time_obj))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+@app.route('/image', methods=['GET'])
+def get_image():
+    return f'<img src="{IMAGE_URL}" alt="image" />'
+
+@app.route('/healthz', methods=['GET'])
+def health_check():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT 1;")
+        cur.fetchone()
+        cur.close()
+        conn.close()
+        return jsonify({"status": "healthy"}), 200
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)

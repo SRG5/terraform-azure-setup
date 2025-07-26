@@ -1,0 +1,72 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - postgresql
+  - postgresql-contrib
+
+ssh_pwauth: true
+
+chpasswd:
+  expire: false
+
+users:
+  - name: dbuser
+    groups: sudo
+    shell: /bin/bash
+    lock_passwd: false
+    plain_text_passwd: "P@ssw0rd123"
+    
+write_files:
+  - path: /tmp/setup_postgres.sh
+    permissions: '0755'
+    owner: root
+    content: |
+      #!/bin/bash
+      echo "[INFO] Creating PostgreSQL user and DB..."
+
+      # יצירת משתמש admin עם סיסמה אם לא קיים
+      sudo -u postgres psql -c "DO \$\$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'admin') THEN
+          CREATE ROLE admin LOGIN PASSWORD 'admin123';
+        END IF;
+      END
+      \$\$;"
+
+      # יצירת DB אם לא קיים
+      DB_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='simple_net_db'")
+      if [ "$DB_EXISTS" != "1" ]; then
+        sudo -u postgres psql -c "CREATE DATABASE simple_net_db OWNER admin;"
+      fi
+
+      echo "[INFO] Creating table and assigning privileges..."
+
+      # יצירת טבלה אם לא קיימת
+      sudo -u postgres psql -d simple_net_db -c "
+        CREATE TABLE IF NOT EXISTS records (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(100),
+          value INTEGER,
+          time TIMESTAMP
+        );"
+
+      # מתן הרשאות טבלה ל־admin
+      sudo -u postgres psql -d simple_net_db -c "GRANT SELECT, INSERT, UPDATE, DELETE ON records TO admin;"
+
+      # מתן הרשאות לסיקוונס של ה־SERIAL
+      sudo -u postgres psql -d simple_net_db -c "GRANT USAGE, SELECT, UPDATE ON SEQUENCE records_id_seq TO admin;"
+
+      echo "[INFO] Updating PostgreSQL configuration..."
+
+      PG_CONF=$(find /etc/postgresql -name postgresql.conf | head -n 1)
+      HBA_CONF=$(find /etc/postgresql -name pg_hba.conf | head -n 1)
+
+      echo "listen_addresses = '*'" >> $PG_CONF
+      echo "host all all 10.0.0.0/8 md5" >> $HBA_CONF
+
+      echo "[INFO] Restarting PostgreSQL..."
+      systemctl restart postgresql
+
+runcmd:
+  - bash /tmp/setup_postgres.sh
