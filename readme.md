@@ -4,7 +4,7 @@
 
 This project demonstrates a full-stack cloud deployment of a Python Flask application with PostgreSQL on Microsoft Azure using **Terraform**, **cloud-init**, and **VM Scale Sets**. The infrastructure is highly automated and scalable, including a Load Balancer, auto-scaling rules, health checks, and secure networking.
 
-Originally developed for a **DevOps training course**, it showcases core DevOps principles such as infrastructure-as-code (IaC), cloud automation, service resiliency, autoscaling, and monitoring.
+Originally started as a training exercise and extended into a full production-like deployment, it showcases core DevOps principles such as infrastructure-as-code (IaC), cloud automation, service resiliency, autoscaling, and monitoring.
 
 ---
 
